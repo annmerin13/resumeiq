@@ -1,0 +1,55 @@
+### =====================
+### ResumeIQ API Tests
+### =====================
+
+### 1. Test Server
+GET http://localhost:5000/
+###
+
+### 2. Register
+POST http://localhost:5000/api/auth/register
+Content-Type: application/json
+
+{
+  "name": "Test User",
+  "email": "ann@example.com",
+  "password": "ann1234"
+}
+
+###
+
+### 3. Login
+POST http://localhost:5000/api/auth/login
+Content-Type: application/json
+
+{
+  "email": "ann@example.com",
+  "password": "ann1234"
+}
+
+###
+
+### 4. Upload Resume (change file path to your actual resume)
+POST http://localhost:5000/api/resume/upload
+Authorization: Bearer eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpZCI6MSwiZW1haWwiOiJ0ZXN0QGV4YW1wbGUuY29tIiwiaWF0IjoxNzc0MTU3OTE3LCJleHAiOjE3NzQyNDQzMTd9.T7Rg4_ef34BpCotZteaDMzuHNwzc9ZcF2VJayG0JgAA
+Content-Type: multipart/form-data; boundary=----FormBoundary
+
+------FormBoundary
+Content-Disposition: form-data; name="resume"; filename="ANN_MERIN_SHAJI_RESUME.pdf"
+Content-Type: application/pdf
+
+< c:\Users\my pc\OneDrive\Documents\ANN_MERIN_SHAJI_RESUME.pdf
+------FormBoundary--
+
+###
+
+### 5. Analyze Resume (no body needed)
+POST http://localhost:5000/api/scores/analyze/7
+Authorization: Bearer eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpZCI6MSwiZW1haWwiOiJ0ZXN0QGV4YW1wbGUuY29tIiwiaWF0IjoxNzc0MTU3OTE3LCJleHAiOjE3NzQyNDQzMTd9.T7Rg4_ef34BpCotZteaDMzuHNwzc9ZcF2VJayG0JgAA
+
+###
+
+### 6. Get Score
+GET http://localhost:5000/api/scores/3
+Authorization: Bearer eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpZCI6MSwiZW1haWwiOiJ0ZXN0QGV4YW1wbGUuY29tIiwiaWF0IjoxNzc0MTU3OTE3LCJleHAiOjE3NzQyNDQzMTd9.T7Rg4_ef34BpCotZteaDMzuHNwzc9ZcF2VJayG0JgAA
+

@@ -1,0 +1,49 @@
+/* src/styles/theme.css */
+@import url('https://fonts.googleapis.com/css2?family=Syne:wght@400;600;700;800&family=DM+Sans:wght@300;400;500&display=swap');
+
+:root {
+  /* 60% — Base backgrounds */
+  --bg-primary: #0E0C14;
+  --bg-secondary: #13101E;
+  --bg-tertiary: #1A1628;
+
+  /* 30% — Surfaces & panels */
+  --surface-1: #221D33;
+  --surface-2: #2D2540;
+  --surface-3: #3A3050;
+  --border: #3D3460;
+
+  /* 10% — Lavender accents */
+  --accent: #A78BFA;
+  --accent-bright: #C4B5FD;
+  --accent-dim: #7C3AED;
+  --accent-glow: rgba(167, 139, 250, 0.15);
+
+  /* Text */
+  --text-primary: #EDE9FE;
+  --text-secondary: #A89BC2;
+  --text-muted: #6B5F85;
+
+  /* Status */
+  --success: #34D399;
+  --warning: #FBBF24;
+  --danger: #F87171;
+
+  /* Typography */
+  --font-display: 'Syne', sans-serif;
+  --font-body: 'DM Sans', sans-serif;
+
+  /* Spacing & radius */
+  --radius-sm: 8px;
+  --radius-md: 14px;
+  --radius-lg: 20px;
+}
+
+* { box-sizing: border-box; margin: 0; padding: 0; }
+
+body {
+  background-color: var(--bg-primary);
+  color: var(--text-primary);
+  font-family: var(--font-body);
+  min-height: 100vh;
+}
