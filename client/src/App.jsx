@@ -4,10 +4,10 @@ import { BrowserRouter, Routes, Route, Navigate } from 'react-router-dom'
 import './styles/theme.css'
 
 import Navbar from './components/Navbar'
-import Login from './pages/Login'
-import Register from './pages/Register'
-import Dashboard from './pages/Dashboard'
-import ScorePage from './pages/ScorePage'
+import Login from './Pages/Login'
+import Register from './Pages/Register'
+import Dashboard from './Pages/Dashboard'
+import ScorePage from './Pages/ScorePage'
 
 const ProtectedRoute = ({ children }) => {
   const token = localStorage.getItem('token')
