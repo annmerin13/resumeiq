@@ -3,16 +3,13 @@
 const express = require('express');
 const router = express.Router();
 const Groq = require('groq-sdk');
-const { Pool } = require('pg');
 const path = require('path');
 const authenticateToken = require('../middleware/authMiddleware');
 const parseResume = require('../utils/parseResume');
+const pool = require('../db'); // ← use shared pool
 
 const groq = new Groq({ apiKey: process.env.GROQ_API_KEY });
-const pool = new Pool({
-  connectionString: process.env.DATABASE_URL,
-  ssl: { rejectUnauthorized: false },
-});
+
 
 // ── Prompt builder ──────────────────────────────────────────────
 function buildPrompt(resumeText, jobDescription) {
