@@ -5,24 +5,27 @@ const pool = require('../db');
 
 // POST /api/auth/register
 router.post('/register', async (req, res) => {
-  const { name, email, password } = req.body;
+  const name = req.body.name?.trim();
+  const email = req.body.email?.trim().toLowerCase();
+  const password = req.body.password;
+
+  if (!name || !email || !password) {
+    return res.status(400).json({ message: 'All fields are required.' });
+  }
 
   try {
-    // 1. Check if user already exists
     const existingUser = await pool.query(
-      'SELECT * FROM users WHERE email = $1',
+      'SELECT id FROM users WHERE LOWER(email) = $1',
       [email]
     );
 
     if (existingUser.rows.length > 0) {
-      return res.status(400).json({ message: 'Email already registered' });
+      return res.status(400).json({ message: 'Email already exists' });
     }
 
-    // 2. Hash the password
     const salt = await bcrypt.genSalt(10);
     const hashedPassword = await bcrypt.hash(password, salt);
 
-    // 3. Save user to DB
     const newUser = await pool.query(
       'INSERT INTO users (name, email, password) VALUES ($1, $2, $3) RETURNING id, name, email',
       [name, email, hashedPassword]
@@ -34,6 +37,9 @@ router.post('/register', async (req, res) => {
     });
 
   } catch (err) {
+    if (err.code === '23505') {
+      return res.status(400).json({ message: 'Email already exists' });
+    }
     console.error(err.message);
     res.status(500).json({ message: 'Server error' });
   }
@@ -43,12 +49,16 @@ const jwt = require('jsonwebtoken');
 
 // POST /api/auth/login
 router.post('/login', async (req, res) => {
-  const { email, password } = req.body;
+  const email = req.body.email?.trim().toLowerCase();
+  const password = req.body.password;
+
+  if (!email || !password) {
+    return res.status(400).json({ message: 'Email and password are required.' });
+  }
 
   try {
-    // 1. Check if user exists
     const user = await pool.query(
-      'SELECT * FROM users WHERE email = $1',
+      'SELECT * FROM users WHERE LOWER(email) = $1',
       [email]
     );
 

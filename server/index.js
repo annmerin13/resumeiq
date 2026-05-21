@@ -22,6 +22,12 @@ app.use("/api/scores", scoreRoutes);
 const path = require('path');
 // Serve uploads folder as static
 app.use('/uploads', express.static(path.join(__dirname, 'uploads')));
+
+const jdMatchRoutes = require('./routes/jdMatch');
+app.use('/api/jd-match', jdMatchRoutes);
+
+
+
 // Test route
 app.get('/', (req, res) => {
   res.send('ResumeIQ API is running ✅');
