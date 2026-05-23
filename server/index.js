@@ -25,6 +25,16 @@ app.use('/api/jd-match', jdMatchRoutes);
 app.get('/', (req, res) => res.send('ResumeIQ API is running ✅'));
 app.get('/api/test', (req, res) => res.json({ message: 'API is working ✅' }));
 
+
+app.get('/api/debug-user', async (req, res) => {
+  const pool = require('./db');
+  const users = await pool.query('SELECT id, email FROM users');
+  res.json(users.rows);
+});
+
+
+
+
 const uploadsDir = path.join(__dirname, 'uploads');
 fs.mkdirSync(uploadsDir, { recursive: true });
 app.use('/uploads', express.static(uploadsDir));
