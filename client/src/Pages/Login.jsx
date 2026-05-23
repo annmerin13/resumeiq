@@ -25,7 +25,7 @@ export default function Login() {
 
     setLoading(true)
     try {
-      const res = await axios.post('${API_BASE}/api/auth/login', form)
+      const res = await axios.post(`${API_BASE}/api/auth/login`, form)
       localStorage.setItem('token', res.data.token)
       navigate('/')
     } catch (err) {
