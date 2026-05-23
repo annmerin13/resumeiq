@@ -1,3 +1,4 @@
+// server/config/db.js
 const { Sequelize } = require('sequelize');
 require('dotenv').config();
 
