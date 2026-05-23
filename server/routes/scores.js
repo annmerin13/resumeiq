@@ -6,6 +6,7 @@ const path = require("path");
 const db = require("../db");
 const authMiddleware = require("../middleware/authMiddleware");
 const scoreResume = require("../utils/scoreResume");
+const resolveResumePath = require("../utils/resolveResumePath");
 
 // POST /api/scores/analyze/:resumeId
 router.post("/analyze/:resumeId", authMiddleware, async (req, res) => {
@@ -24,7 +25,10 @@ router.post("/analyze/:resumeId", authMiddleware, async (req, res) => {
     }
 
     const resume = resumeResult.rows[0];
-    const filePath = path.resolve(resume.file_path);
+    const filePath = resolveResumePath(resume.file_path);
+    if (!filePath) {
+      return res.status(400).json({ error: "Resume file not found on server." });
+    }
 
     // Run scoring
     const { overallScore, resumeText, categories } = await scoreResume(filePath);

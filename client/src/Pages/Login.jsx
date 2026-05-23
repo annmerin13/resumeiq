@@ -13,13 +13,22 @@ export default function Login() {
 
   const handleSubmit = async () => {
     setError(null)
+
+    if (!form.email.trim() || !form.password.trim()) {
+      return setError('Email and password are required.')
+    }
+    const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/
+    if (!emailRegex.test(form.email)) {
+      return setError('Please enter a valid email address.')
+    }
+
     setLoading(true)
     try {
       const res = await axios.post('http://localhost:5000/api/auth/login', form)
       localStorage.setItem('token', res.data.token)
       navigate('/')
     } catch (err) {
-      setError(err.response?.data?.message || 'Login failed')
+      setError(err.response?.data?.message || 'Login failed. Please try again.')
     } finally {
       setLoading(false)
     }

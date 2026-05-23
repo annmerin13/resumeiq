@@ -2,6 +2,7 @@
 import React, { useEffect, useState } from 'react'
 import { useParams, useNavigate } from 'react-router-dom'
 import axios from 'axios'
+import { API_BASE, authHeaders } from '../lib/api'
 import ScoreCard from '../components/ScoreCard'
 import ScoreBreakdown from '../components/ScoreBreakdown'
 
@@ -14,18 +15,11 @@ export default function ScorePage() {
 
   useEffect(() => {
     const run = async () => {
-      const token = localStorage.getItem('token')
-      const headers = {
-        Authorization: `Bearer ${token}`,
-        'Content-Type': 'application/json',
-      }
-
       try {
-        // Always just analyze — simplest flow
         const res = await axios.post(
-          `http://localhost:5000/api/scores/analyze/${id}`,
+          `${API_BASE}/api/scores/analyze/${id}`,
           {},
-          { headers }
+          { headers: authHeaders(true) }
         )
 
         console.log('API response:', res.data)

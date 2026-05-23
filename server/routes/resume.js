@@ -1,47 +1,61 @@
-// filename: server/routes/resume.js
-
 const express = require('express');
 const router = express.Router();
+const path = require('path');
 const pool = require('../db');
 const authMiddleware = require('../middleware/authMiddleware');
 const upload = require('../middleware/upload');
-const parseResume = require('../utils/parseResume');
-const path = require('path');
+const extractResumeText = require('../utils/extractResumeText');
+const resolveResumePath = require('../utils/resolveResumePath');
+
+const handleUpload = (req, res, next) => {
+  upload.single('resume')(req, res, (err) => {
+    if (!err) return next();
+    if (err.code === 'LIMIT_FILE_SIZE') {
+      return res.status(400).json({ message: 'File too large. Maximum size is 5MB.' });
+    }
+    return res.status(400).json({ message: err.message || 'Invalid file upload.' });
+  });
+};
 
 // POST /api/resume/upload (protected)
-router.post('/upload', authMiddleware, upload.single('resume'), async (req, res) => {
+router.post('/upload', authMiddleware, handleUpload, async (req, res) => {
   try {
     if (!req.file) {
       return res.status(400).json({ message: 'No file uploaded' });
     }
 
-    // Extract text at upload time
     const filePath = path.resolve(req.file.path);
-    let extractedText = null;
-    try {
-      extractedText = await parseResume(filePath);
-    } catch (parseErr) {
-      console.warn('Text extraction failed:', parseErr.message);
-      // Don't block upload if parsing fails
-    }
 
     const newResume = await pool.query(
-      'INSERT INTO resumes (user_id, file_name, file_path, extracted_text) VALUES ($1, $2, $3, $4) RETURNING *',
-      [req.user.id, req.file.originalname, req.file.path, extractedText]
+      'INSERT INTO resumes (user_id, file_name, file_path, extracted_text) VALUES ($1, $2, $3, $4) RETURNING id, user_id, file_name, file_path, extracted_text, created_at',
+      [req.user.id, req.file.originalname, filePath, null]
     );
 
     res.status(201).json({
       message: 'Resume uploaded successfully',
-      resume: newResume.rows[0]
+      resume: newResume.rows[0],
     });
 
+    // Parse text in background so upload never hangs on slow PDFs
+    extractResumeText(filePath)
+      .then((text) => {
+        if (!text) return;
+        return pool.query(
+          'UPDATE resumes SET extracted_text = $1 WHERE id = $2 AND user_id = $3',
+          [text, newResume.rows[0].id, req.user.id]
+        );
+      })
+      .catch((err) => console.warn('Background text extraction failed:', err.message));
   } catch (err) {
-    console.error(err.message);
+    console.error('Resume upload error:', err.message);
+    if (err.code === '42P01') {
+      return res.status(500).json({ message: 'Database not ready. Run: npm run migrate' });
+    }
     res.status(500).json({ message: 'Server error' });
   }
 });
 
-// GET /api/resumes (protected)
+// GET /api/resume (protected)
 router.get('/', authMiddleware, async (req, res) => {
   try {
     const resumes = await pool.query(

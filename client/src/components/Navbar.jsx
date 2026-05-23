@@ -1,15 +1,25 @@
-// src/components/Navbar.jsx
+// filename: client/src/components/Navbar.jsx
+// replace the location label span with nav links
+
 import React from 'react'
-import { useNavigate, useLocation } from 'react-router-dom'
+import { useNavigate, useLocation, NavLink } from 'react-router-dom'
 
 export default function Navbar() {
   const navigate = useNavigate()
-  const location = useLocation()
 
   const handleLogout = () => {
     localStorage.removeItem('token')
     navigate('/login')
   }
+
+  const linkStyle = (isActive) => ({
+    color: isActive ? 'var(--accent-bright)' : 'var(--text-muted)',
+    fontSize: '0.875rem',
+    fontWeight: isActive ? 600 : 400,
+    textDecoration: 'none',
+    fontFamily: 'var(--font-body)',
+    transition: 'color 0.2s',
+  })
 
   return (
     <nav style={{
@@ -38,10 +48,9 @@ export default function Navbar() {
         Resume<span style={{ color: 'var(--text-primary)' }}>IQ</span>
       </span>
 
-      <div style={{ display: 'flex', alignItems: 'center', gap: '1rem' }}>
-        <span style={{ color: 'var(--text-muted)', fontSize: '0.85rem' }}>
-          {location.pathname === '/' ? 'Dashboard' : 'Score Analysis'}
-        </span>
+      <div style={{ display: 'flex', alignItems: 'center', gap: '1.5rem' }}>
+        <NavLink to='/' end style={({ isActive }) => linkStyle(isActive)}>Dashboard</NavLink>
+        <NavLink to='/jd-match' style={({ isActive }) => linkStyle(isActive)}>JD Match</NavLink>
         <button
           onClick={handleLogout}
           style={{

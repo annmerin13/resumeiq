@@ -2,6 +2,7 @@ const express = require('express');
 const cors = require('cors');
 const dotenv = require('dotenv');
 const sequelize = require('./config/db');
+const runMigrationsOnBoot = require('./utils/runMigrationsOnBoot');
 
 dotenv.config();
 
@@ -20,8 +21,11 @@ const scoreRoutes = require("./routes/scores");
 app.use("/api/scores", scoreRoutes);
 
 const path = require('path');
-// Serve uploads folder as static
-app.use('/uploads', express.static(path.join(__dirname, 'uploads')));
+const fs = require('fs');
+
+const uploadsDir = path.join(__dirname, 'uploads');
+fs.mkdirSync(uploadsDir, { recursive: true });
+app.use('/uploads', express.static(uploadsDir));
 
 const jdMatchRoutes = require('./routes/jdMatch');
 app.use('/api/jd-match', jdMatchRoutes);
@@ -39,14 +43,14 @@ app.get('/api/test', (req, res) => {
 sequelize.authenticate()
   .then(() => {
     console.log('PostgreSQL connected ✅');
-    return sequelize.sync();
+    return runMigrationsOnBoot();
   })
   .then(() => {
     app.listen(process.env.PORT, () => {
       console.log(`Server running on port ${process.env.PORT} ✅`);
     });
   })
-    .catch((err) => console.log('DB Connection Error:', err));
+  .catch((err) => console.log('DB Connection Error:', err));
   
 
 

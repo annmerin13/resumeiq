@@ -13,12 +13,30 @@ export default function Register() {
 
   const handleSubmit = async () => {
     setError(null)
+
+    // --- Front-end validation ---
+    if (!form.name.trim() || !form.email.trim() || !form.password.trim()) {
+      return setError('All fields are required.')
+    }
+    const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/
+    if (!emailRegex.test(form.email)) {
+      return setError('Please enter a valid email address.')
+    }
+    if (form.password.length < 6) {
+      return setError('Password must be at least 6 characters.')
+    }
+
     setLoading(true)
     try {
-      await axios.post('http://localhost:5000/api/auth/register', form)
+      await axios.post('/api/auth/register', {
+        name: form.name.trim(),
+        email: form.email.trim().toLowerCase(),
+        password: form.password,
+      })
       navigate('/login')
     } catch (err) {
-      setError(err.response?.data?.message || 'Registration failed')
+      const message = err.response?.data?.message
+      setError(message || 'Registration failed. Please try again.')
     } finally {
       setLoading(false)
     }

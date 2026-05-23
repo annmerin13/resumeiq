@@ -1,24 +1,28 @@
 // src/pages/Dashboard.jsx
-import React, { useEffect, useState } from 'react'
+import React, { useEffect, useState, useRef } from 'react'
 import { useNavigate } from 'react-router-dom'
 import axios from 'axios'
+import { API_BASE, authHeaders } from '../lib/api'
+
+const MAX_FILE_BYTES = 5 * 1024 * 1024
 
 export default function Dashboard() {
+  const fileInputRef = useRef(null)
   const [resumes, setResumes] = useState([])
   const [loading, setLoading] = useState(true)
   const [uploading, setUploading] = useState(false)
   const [deletingId, setDeletingId] = useState(null)
+  const [error, setError] = useState(null)
   const navigate = useNavigate()
-
-  const token = localStorage.getItem('token')
-  const headers = { Authorization: `Bearer ${token}` }
 
   const fetchResumes = async () => {
     try {
-      const res = await axios.get('http://localhost:5000/api/resume', { headers })
+      const res = await axios.get(`${API_BASE}/api/resume`, { headers: authHeaders() })
       setResumes(res.data)
+      setError(null)
     } catch (e) {
       console.error(e)
+      setError('Failed to load resumes.')
     } finally {
       setLoading(false)
     }
@@ -27,16 +31,37 @@ export default function Dashboard() {
   useEffect(() => { fetchResumes() }, [])
 
   const handleUpload = async (e) => {
-    const file = e.target.files[0]
+    const file = e.target.files?.[0]
     if (!file) return
+
+    const ext = file.name.split('.').pop()?.toLowerCase()
+    if (!['pdf', 'docx'].includes(ext)) {
+      setError('Only PDF and DOCX files are allowed.')
+      e.target.value = ''
+      return
+    }
+    if (file.size > MAX_FILE_BYTES) {
+      setError('File too large. Maximum size is 5MB.')
+      e.target.value = ''
+      return
+    }
+
     const form = new FormData()
     form.append('resume', file)
     setUploading(true)
+    setError(null)
     try {
-      await axios.post('http://localhost:5000/api/resume/upload', form, { headers })
+      await axios.post(`${API_BASE}/api/resume/upload`, form, {
+        headers: authHeaders(),
+      })
       await fetchResumes()
     } catch (err) {
-      alert('Upload failed')
+      if (err.response?.status === 401) {
+        setError('Session expired. Please sign in again.')
+        navigate('/login')
+        return
+      }
+      setError(err.response?.data?.message || 'Upload failed. Please try again.')
     } finally {
       setUploading(false)
       e.target.value = ''
@@ -48,10 +73,10 @@ export default function Dashboard() {
     if (!window.confirm('Delete this resume? This cannot be undone.')) return
     setDeletingId(id)
     try {
-      await axios.delete(`http://localhost:5000/api/resume/${id}`, { headers })
+      await axios.delete(`${API_BASE}/api/resume/${id}`, { headers: authHeaders() })
       setResumes(prev => prev.filter(r => r.id !== id))
     } catch (err) {
-      alert('Failed to delete resume')
+      setError(err.response?.data?.message || 'Failed to delete resume')
     } finally {
       setDeletingId(null)
     }
@@ -59,7 +84,6 @@ export default function Dashboard() {
 
   return (
     <div>
-      {/* Header */}
       <div style={{
         display: 'flex',
         justifyContent: 'space-between',
@@ -84,32 +108,51 @@ export default function Dashboard() {
           </p>
         </div>
 
-        <label style={{
-          background: 'var(--accent-dim)',
-          color: 'var(--accent-bright)',
-          border: '1px solid var(--accent)',
-          borderRadius: 'var(--radius-sm)',
-          padding: '0.6rem 1.4rem',
-          fontSize: '0.9rem',
-          fontWeight: 600,
-          cursor: uploading ? 'not-allowed' : 'pointer',
-          fontFamily: 'var(--font-body)',
-          opacity: uploading ? 0.6 : 1,
-          transition: 'all 0.2s',
-          whiteSpace: 'nowrap',
-        }}>
+        <button
+          type="button"
+          onClick={() => fileInputRef.current?.click()}
+          disabled={uploading}
+          style={{
+            background: 'var(--accent-dim)',
+            color: 'var(--accent-bright)',
+            border: '1px solid var(--accent)',
+            borderRadius: 'var(--radius-sm)',
+            padding: '0.6rem 1.4rem',
+            fontSize: '0.9rem',
+            fontWeight: 600,
+            cursor: uploading ? 'not-allowed' : 'pointer',
+            fontFamily: 'var(--font-body)',
+            opacity: uploading ? 0.6 : 1,
+            transition: 'all 0.2s',
+            whiteSpace: 'nowrap',
+          }}
+        >
           {uploading ? 'Uploading...' : '+ Upload Resume'}
-          <input
-            type="file"
-            accept=".pdf,.doc,.docx"
-            onChange={handleUpload}
-            style={{ display: 'none' }}
-            disabled={uploading}
-          />
-        </label>
+        </button>
+        <input
+          ref={fileInputRef}
+          type="file"
+          accept=".pdf,.docx,application/pdf,application/vnd.openxmlformats-officedocument.wordprocessingml.document"
+          onChange={handleUpload}
+          style={{ display: 'none' }}
+          disabled={uploading}
+        />
       </div>
 
-      {/* States */}
+      {error && (
+        <div style={{
+          background: 'rgba(248,113,113,0.1)',
+          border: '1px solid var(--danger)',
+          borderRadius: 'var(--radius-sm)',
+          padding: '0.75rem 1rem',
+          marginBottom: '1.25rem',
+          color: 'var(--danger)',
+          fontSize: '0.875rem',
+        }}>
+          {error}
+        </div>
+      )}
+
       {loading ? (
         <div style={{ textAlign: 'center', padding: '4rem' }}>
           <p style={{ color: 'var(--text-muted)', fontFamily: 'var(--font-display)' }}>
@@ -165,7 +208,6 @@ export default function Dashboard() {
                 e.currentTarget.style.background = 'var(--surface-1)'
               }}
             >
-              {/* File icon + type badge */}
               <div style={{
                 display: 'flex',
                 justifyContent: 'space-between',
@@ -196,7 +238,6 @@ export default function Dashboard() {
                 </span>
               </div>
 
-              {/* File name */}
               <p style={{
                 fontFamily: 'var(--font-display)',
                 fontWeight: 700,
@@ -210,7 +251,6 @@ export default function Dashboard() {
                 {r.file_name || `Resume #${r.id}`}
               </p>
 
-              {/* Date */}
               <p style={{ fontSize: '0.8rem', color: 'var(--text-muted)' }}>
                 {r.created_at
                   ? new Date(r.created_at).toLocaleDateString('en-US', {
@@ -219,7 +259,6 @@ export default function Dashboard() {
                   : '—'}
               </p>
 
-              {/* Footer: View Score + Delete */}
               <div style={{
                 marginTop: '1.25rem',
                 paddingTop: '1rem',
@@ -251,16 +290,6 @@ export default function Dashboard() {
                     transition: 'all 0.2s',
                     opacity: deletingId === r.id ? 0.5 : 1,
                     fontFamily: 'var(--font-body)',
-                  }}
-                  onMouseEnter={e => {
-                    if (deletingId !== r.id) {
-                      e.currentTarget.style.background = 'rgba(248,113,113,0.3)'
-                      e.currentTarget.style.borderColor = '#F87171'
-                    }
-                  }}
-                  onMouseLeave={e => {
-                    e.currentTarget.style.background = 'rgba(248,113,113,0.15)'
-                    e.currentTarget.style.borderColor = 'rgba(248,113,113,0.6)'
                   }}
                 >
                   {deletingId === r.id ? 'Deleting…' : '🗑 Delete'}

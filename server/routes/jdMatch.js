@@ -1,17 +1,20 @@
-// filename: server/routes/jdMatch.js
-
 const express = require('express');
 const router = express.Router();
 const Groq = require('groq-sdk');
-const path = require('path');
 const authenticateToken = require('../middleware/authMiddleware');
-const parseResume = require('../utils/parseResume');
-const pool = require('../db'); // ← use shared pool
+const extractResumeText = require('../utils/extractResumeText');
+const resolveResumePath = require('../utils/resolveResumePath');
+const parseLlmJson = require('../utils/parseLlmJson');
+const pool = require('../db');
 
-const groq = new Groq({ apiKey: process.env.GROQ_API_KEY });
+const GROQ_MODEL = process.env.GROQ_MODEL || 'llama-3.3-70b-versatile';
 
+function getGroqClient() {
+  const apiKey = process.env.GROQ_API_KEY;
+  if (!apiKey) return null;
+  return new Groq({ apiKey });
+}
 
-// ── Prompt builder ──────────────────────────────────────────────
 function buildPrompt(resumeText, jobDescription) {
   return `You are an ATS and recruitment expert. Analyze how well this resume matches the job description.
 
@@ -33,17 +36,41 @@ OUTPUT RULES:
 }`;
 }
 
-// ── POST /api/jd-match/analyze ──────────────────────────────────
+async function getResumeText(extractedText, filePath) {
+  if (extractedText && extractedText.trim()) {
+    return extractedText.trim();
+  }
+
+  const resolvedPath = resolveResumePath(filePath);
+  if (!resolvedPath) {
+    return null;
+  }
+
+  const text = await extractResumeText(resolvedPath);
+  if (text && text.trim()) {
+    return text.trim();
+  }
+
+  return null;
+}
+
 router.post('/analyze', authenticateToken, async (req, res) => {
   const { resume_id, job_title, company_name, job_description } = req.body;
 
-  if (!resume_id || !job_description) {
+  if (!resume_id || !job_description?.trim()) {
     return res.status(400).json({ error: 'resume_id and job_description are required.' });
+  }
+
+  const groq = getGroqClient();
+  if (!groq) {
+    return res.status(503).json({
+      error: 'AI is not configured. Add GROQ_API_KEY to your server .env file.',
+    });
   }
 
   try {
     const resumeResult = await pool.query(
-      `SELECT extracted_text, file_path FROM resumes WHERE id = $1 AND user_id = $2`,
+      'SELECT extracted_text, file_path FROM resumes WHERE id = $1 AND user_id = $2',
       [resume_id, req.user.id]
     );
 
@@ -52,32 +79,34 @@ router.post('/analyze', authenticateToken, async (req, res) => {
     }
 
     const { extracted_text, file_path } = resumeResult.rows[0];
+    const resumeText = await getResumeText(extracted_text, file_path);
 
-    // Fallback: parse from file if extracted_text is null
-    let resumeText = extracted_text;
     if (!resumeText) {
-      try {
-        resumeText = await parseResume(path.resolve(file_path));
-      } catch (parseErr) {
-        return res.status(400).json({ error: 'Could not extract text from resume file.' });
-      }
+      return res.status(400).json({
+        error: 'Could not read text from this resume. Try re-uploading as PDF or DOCX.',
+      });
     }
 
-    const prompt = buildPrompt(resumeText, job_description);
+    const prompt = buildPrompt(resumeText, job_description.trim());
 
     const completion = await groq.chat.completions.create({
-      model: 'llama-3.3-70b-versatile',
+      model: GROQ_MODEL,
       messages: [{ role: 'user', content: prompt }],
       temperature: 0.3,
       max_tokens: 1500,
+      response_format: { type: 'json_object' },
     });
 
-    const raw = completion.choices[0].message.content.trim();
+    const raw = completion.choices[0]?.message?.content?.trim();
+    if (!raw) {
+      return res.status(500).json({ error: 'AI returned an empty response. Try again.' });
+    }
 
     let analysis;
     try {
-      analysis = JSON.parse(raw);
-    } catch {
+      analysis = parseLlmJson(raw);
+    } catch (parseErr) {
+      console.error('JD JSON parse error:', parseErr.message, raw.slice(0, 200));
       return res.status(500).json({ error: 'AI returned invalid JSON. Try again.' });
     }
 
@@ -91,7 +120,7 @@ router.post('/analyze', authenticateToken, async (req, res) => {
         resume_id,
         job_title || null,
         company_name || null,
-        job_description,
+        job_description.trim(),
         analysis.match_score,
         JSON.stringify(analysis.matched_keywords),
         JSON.stringify(analysis.missing_skills),
@@ -113,11 +142,26 @@ router.post('/analyze', authenticateToken, async (req, res) => {
     });
   } catch (err) {
     console.error('JD match error:', err);
-    res.status(500).json({ error: 'Failed to analyze match.' });
+
+    const groqMsg = err?.error?.message || err?.message || '';
+    if (groqMsg.includes('api_key') || groqMsg.includes('API key')) {
+      return res.status(503).json({ error: 'Invalid GROQ_API_KEY. Check your server .env file.' });
+    }
+    if (groqMsg.includes('decommissioned') || groqMsg.includes('model')) {
+      return res.status(502).json({
+        error: `AI model error: ${groqMsg}. Set GROQ_MODEL in .env (e.g. llama-3.3-70b-versatile).`,
+      });
+    }
+    if (err.code === '42P01') {
+      return res.status(500).json({ error: 'Database not ready. Run: npm run migrate' });
+    }
+
+    res.status(500).json({
+      error: groqMsg || 'Failed to analyze match.',
+    });
   }
 });
 
-// ── GET /api/jd-match/history ───────────────────────────────────
 router.get('/history', authenticateToken, async (req, res) => {
   try {
     const result = await pool.query(
@@ -134,11 +178,10 @@ router.get('/history', authenticateToken, async (req, res) => {
   }
 });
 
-// ── GET /api/jd-match/:id ───────────────────────────────────────
 router.get('/:id', authenticateToken, async (req, res) => {
   try {
     const result = await pool.query(
-      `SELECT * FROM jd_matches WHERE id = $1 AND user_id = $2`,
+      'SELECT * FROM jd_matches WHERE id = $1 AND user_id = $2',
       [req.params.id, req.user.id]
     );
 

@@ -1,0 +1,1 @@
+ALTER TABLE resumes ADD COLUMN IF NOT EXISTS extracted_text TEXT;
