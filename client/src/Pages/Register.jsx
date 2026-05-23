@@ -2,7 +2,7 @@
 import React, { useState } from 'react'
 import { useNavigate, Link } from 'react-router-dom'
 import axios from 'axios'
-
+import { API_BASE } from '../lib/api'
 export default function Register() {
   const [form, setForm] = useState({ name: '', email: '', password: '' })
   const [error, setError] = useState(null)
@@ -28,7 +28,7 @@ export default function Register() {
 
     setLoading(true)
     try {
-      await axios.post('/api/auth/register', {
+      await axios.post(`${API_BASE}/api/auth/register`, {
         name: form.name.trim(),
         email: form.email.trim().toLowerCase(),
         password: form.password,
